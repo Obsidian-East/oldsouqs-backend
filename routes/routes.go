@@ -11,10 +11,15 @@ import (
 
 func SetupRoutes(db *mongo.Database) *mux.Router {
 	router := mux.NewRouter()
-
-	// Pass db to handlers
+	
+	// Signup route
 	router.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
 		controllers.SignupHandler(w, r, db)
+	}).Methods("POST")
+
+	// Login route
+	router.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		controllers.LoginHandler(w, r, db)
 	}).Methods("POST")
 
 	return router
