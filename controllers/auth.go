@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -15,30 +14,55 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func validate(user models.User) error {
-	// Password validation (at least 10 characters, 1 special, 1 uppercase, 1 number)
-	passwordRegex := `^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()\-_=+{};:,<.>]).{10,}$`
-	matched, _ := regexp.MatchString(passwordRegex, user.Password)
-	if !matched {
-		return errors.New("password must contain at least 10 characters, 1 special character, 1 uppercase letter, and 1 number")
+func validate(user models.User) string {
+	// Check minimum length
+	if len(user.Password) < 10 {
+		return "Password must contain at least 10 characters"
 	}
 
-	// Email validation (basic format validation)
+	// Check for at least one uppercase letter, one number, and one special character
+	hasUpper := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, char := range user.Password {
+		switch {
+		case char >= 'A' && char <= 'Z':
+			hasUpper = true
+		case char >= '0' && char <= '9':
+			hasDigit = true
+		case (char >= '!' && char <= '/') || (char >= ':' && char <= '@') || (char >= '[' && char <= '`') || (char >= '{' && char <= '~'):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper {
+		return "Password must contain at least one uppercase letter"
+	}
+	if !hasDigit {
+		return "Password must contain at least one number"
+	}
+	if !hasSpecial {
+		return "Password must contain at least one special character"
+	}
+
+	// Email validation
 	emailRegex := `^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`
-	matched, _ = regexp.MatchString(emailRegex, user.Email)
+	matched, _ := regexp.MatchString(emailRegex, user.Email)
 	if !matched {
-		return errors.New("invalid email format")
+		return "Invalid email format"
 	}
 
-	// Phone number validation (starting with +961 or 00961)
-	phoneRegex := `^(?:\+961|00961)[0-9]{8,}$`
+	// Phone number validation
+	phoneRegex := `^(?:\+961|00961)[0-9]{8}$`
 	matched, _ = regexp.MatchString(phoneRegex, user.PhoneNumber)
 	if !matched {
-		return errors.New("phone number must start with +961 or 00961 followed by 8 digits")
+		return "Phone number must start with +961 or 00961 followed by 8 digits"
 	}
 
-	return nil
+	return ""
 }
+
 
 func SignupHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	var user models.User
@@ -51,10 +75,10 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	err = validate(user)
-	if err != nil {
-		http.Error(w, "Error Validating your request", http.StatusBadRequest)
-		fmt.Println("Error in validation:", err)
+	valError := validate(user)
+	if valError != "" {
+		http.Error(w, valError, http.StatusBadRequest)
+		fmt.Println("Error in validation:", valError)
 		return
 	}
 
