@@ -17,7 +17,7 @@ import (
 
 func validate(user models.User) error {
 	// Password validation (at least 10 characters, 1 special, 1 uppercase, 1 number)
-	passwordRegex := `^(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).{10,}$`
+	passwordRegex := `^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()\-_=+{};:,<.>]).{10,}$`
 	matched, _ := regexp.MatchString(passwordRegex, user.Password)
 	if !matched {
 		return errors.New("password must contain at least 10 characters, 1 special character, 1 uppercase letter, and 1 number")
