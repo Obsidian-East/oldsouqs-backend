@@ -141,7 +141,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	// Compare the provided password with the stored hashed password
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userInput.Password))
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		http.Error(w, "Wrong Password", http.StatusUnauthorized)
 		return
 	}
 
