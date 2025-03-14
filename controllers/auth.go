@@ -6,28 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"time"
-	"os"
 
 	"oldsouqs-backend/models"
+	"oldsouqs-backend/utils"
 
-	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var jwtKey = []byte(os.Getenv("JWT_SECRET"))
-
-type Credentials struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type Claims struct {
-	Email string `json:"email"`
-	jwt.RegisteredClaims
-}
 
 func validate(user models.User) string {
 	// Check minimum length
@@ -135,46 +121,42 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var creds Credentials
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-		http.Error(w, `{"error": "Invalid request format"}`, http.StatusBadRequest)
+	var userInput models.User
+	// Decode the login data (email and password)
+	err := json.NewDecoder(r.Body).Decode(&userInput)
+	if err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 
-	// Find user by email
+	// Fetch user from the database by email
 	var user models.User
-	err := db.Collection("users").FindOne(context.TODO(), bson.M{"email": creds.Email}).Decode(&user)
+	collection := db.Collection("users")
+	err = collection.FindOne(r.Context(), bson.M{"email": userInput.Email}).Decode(&user)
 	if err != nil {
-		http.Error(w, `{"error": "Invalid email or password"}`, http.StatusUnauthorized)
+		http.Error(w, "User not found", http.StatusUnauthorized)
 		return
 	}
 
-	// Compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password)); err != nil {
-		http.Error(w, `{"error": "Invalid email or password"}`, http.StatusUnauthorized)
-		return
-	}
-
-	// Generate JWT token
-	expirationTime := time.Now().Add(24 * time.Hour) // Token expires in 24 hours
-	claims := &Claims{
-		Email: user.Email,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtKey)
+	// Compare the provided password with the stored hashed password
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userInput.Password))
 	if err != nil {
-		http.Error(w, `{"error": "Could not create token"}`, http.StatusInternalServerError)
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	// Send token in response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+	// Generate JWT token (optional, if using JWT for session management)
+	token, err := utils.GenerateJWT(user)
+	if err != nil {
+		http.Error(w, "Could not generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Return success with the JWT token
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"message": "Login successful",
+		"token":   token,
+	}
+	json.NewEncoder(w).Encode(response)
 }
