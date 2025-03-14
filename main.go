@@ -1,32 +1,27 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/joho/godotenv"
 	"oldsouqs-backend/config"
 	"oldsouqs-backend/routes"
 )
 
 func main() {
-	// Get PORT from environment variable or default to 8080
+	// Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+	
+	// Get PORT from environment variable or default to 10000
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Default port if PORT is not set
+		port = "10000" // Default port to match Render's assigned port
 	}
 
-	// Example route
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Server is running on port %s!", port)
-	})
-
-	// Start the server
-	log.Printf("Server starting on port %s...", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
-	}
 	// Initialize database connection
 	db, err := config.ConnectDB()
 	if err != nil {
@@ -36,6 +31,6 @@ func main() {
 	// Pass database instance to routes
 	router := routes.SetupRoutes(db)
 
-	fmt.Println("Server is running on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Printf("Server starting on port %s...", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }

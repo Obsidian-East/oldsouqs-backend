@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,11 +25,19 @@ func ConnectDB() (*mongo.Database, error) {
 		return nil, fmt.Errorf("error connecting to MongoDB: %w", err)
 	}
 
+	// Get database name from env variable
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "oldsouqs" // Default database name
+	}
+
+	fmt.Println("Using Database:", dbName)
+
 	// Ping to confirm a successful connection
-	if err := client.Database("oldsouqs").RunCommand(context.TODO(), bson.D{{Key: "ping", Value: 1}}).Err(); err != nil {
+	if err := client.Database(dbName).RunCommand(context.TODO(), bson.D{{Key: "ping", Value: 1}}).Err(); err != nil {
 		return nil, fmt.Errorf("MongoDB ping failed: %w", err)
 	}
 
 	fmt.Println("Connected to MongoDB successfully!")
-	return client.Database("oldsouqs"), nil
+	return client.Database(dbName), nil
 }
