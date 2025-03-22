@@ -7,6 +7,6 @@ type Product struct {
 	Title		string             `bson:"title"`
 	Description string			   `bson:"description"`
 	Price 		string             `bson:"price"`
-	Image    string             `bson:"image"`
+	Image       string             `bson:"image"`
 }
 
