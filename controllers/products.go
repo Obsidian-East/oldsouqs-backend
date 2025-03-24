@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"oldsouqs-backend/models"
 
@@ -15,17 +16,17 @@ import (
 )
 
 func validateProduct(product models.Product) error {
+	if product.Sku == "" {
+		return fmt.Errorf("SKU is required")
+	}
 	if product.Title == "" {
 		return fmt.Errorf("Title is missing")
 	}
-
-	if product.Price == "" {
+	if product.Price == 0.0 {
 		return fmt.Errorf("Price is missing")
 	}
-
 	return nil
 }
-
 
 func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	var product models.Product
@@ -41,7 +42,16 @@ func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	collection := db.Collection("products")
-	_, err := collection.InsertOne(context.TODO(), product)
+
+	// Check if SKU is unique
+	var existingProduct models.Product
+	err := collection.FindOne(context.TODO(), bson.M{"sku": product.Sku}).Decode(&existingProduct)
+	if err == nil {
+		http.Error(w, "SKU already exists", http.StatusConflict)
+		return
+	}
+
+	_, err = collection.InsertOne(context.TODO(), product)
 	if err != nil {
 		http.Error(w, "Failed to create product", http.StatusInternalServerError)
 		return
@@ -66,7 +76,15 @@ func GetProducts(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(products)
+	// Check if the request contains "/ar"
+	isArabic := strings.Contains(r.URL.Path, "/ar")
+
+	var response []map[string]interface{}
+	for _, product := range products {
+		response = append(response, formatProductResponse(product, isArabic))
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 func GetProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
@@ -91,14 +109,20 @@ func GetProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(product)
+	isArabic := strings.Contains(r.URL.Path, "/ar")
+	json.NewEncoder(w).Encode(formatProductResponse(product, isArabic))
 }
-
 
 func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 		return
 	}
 
@@ -109,7 +133,16 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	collection := db.Collection("products")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"_id": id}, bson.M{"$set": product})
+
+	// Ensure SKU remains unique
+	var existingProduct models.Product
+	err = collection.FindOne(context.TODO(), bson.M{"sku": product.Sku, "_id": bson.M{"$ne": objID}}).Decode(&existingProduct)
+	if err == nil {
+		http.Error(w, "SKU already exists", http.StatusConflict)
+		return
+	}
+
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, bson.M{"$set": product})
 	if err != nil {
 		http.Error(w, "Failed to update product", http.StatusInternalServerError)
 		return
@@ -126,12 +159,40 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
+	}
+
 	collection := db.Collection("products")
-	_, err := collection.DeleteOne(context.TODO(), bson.M{"_id": id})
+	_, err = collection.DeleteOne(context.TODO(), bson.M{"_id": objID})
 	if err != nil {
 		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Helper function to format product response based on language
+func formatProductResponse(product models.Product, isArabic bool) map[string]interface{} {
+	if isArabic {
+		return map[string]interface{}{
+			"id":           product.ID,
+			"sku":          product.Sku,
+			"title":        product.TitleAr,
+			"description":  product.DescriptionAr,
+			"price":        product.Price,
+			"image":        product.Image,
+		}
+	}
+	return map[string]interface{}{
+		"id":           product.ID,
+		"sku":          product.Sku,
+		"title":        product.Title,
+		"description":  product.Description,
+		"price":        product.Price,
+		"image":        product.Image,
+	}
 }
