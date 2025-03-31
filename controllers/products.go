@@ -31,32 +31,70 @@ func validateProduct(product models.Product) error {
 func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	var product models.Product
 
+	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
+	// Validate product
 	if err := validateProduct(product); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	collection := db.Collection("products")
+	// MongoDB collections
+	productCollection := db.Collection("products")
+	collectionCollection := db.Collection("collections")
 
 	// Check if SKU is unique
 	var existingProduct models.Product
-	err := collection.FindOne(context.TODO(), bson.M{"sku": product.Sku}).Decode(&existingProduct)
+	err := productCollection.FindOne(context.TODO(), bson.M{"sku": product.Sku}).Decode(&existingProduct)
 	if err == nil {
 		http.Error(w, "SKU already exists", http.StatusConflict)
 		return
 	}
 
-	_, err = collection.InsertOne(context.TODO(), product)
+	// Insert product into database
+	result, err := productCollection.InsertOne(context.TODO(), product)
 	if err != nil {
 		http.Error(w, "Failed to create product", http.StatusInternalServerError)
 		return
 	}
 
+	// Get the inserted product ID
+	insertedID := result.InsertedID.(primitive.ObjectID)
+
+	// If the product has a tag, try to find the corresponding collection
+	if product.Tag != "" {
+		var collection models.Collection
+		err := collectionCollection.FindOne(context.TODO(), bson.M{"collectionName": product.Tag}).Decode(&collection)
+
+		if err != nil { // Collection does not exist, create a new one
+			newCollection := models.Collection{
+				ID:              primitive.NewObjectID(),
+				CollectionName:  product.Tag,
+				ProductIds:      []primitive.ObjectID{insertedID},
+			}
+			_, err := collectionCollection.InsertOne(context.TODO(), newCollection)
+			if err != nil {
+				http.Error(w, "Failed to create collection", http.StatusInternalServerError)
+				return
+			}
+		} else { // Collection exists, update it
+			_, err := collectionCollection.UpdateOne(
+				context.TODO(),
+				bson.M{"_id": collection.ID},
+				bson.M{"$addToSet": bson.M{"productIds": insertedID}}, // Prevent duplicate IDs
+			)
+			if err != nil {
+				http.Error(w, "Failed to update collection", http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	// Send response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(product)
 }

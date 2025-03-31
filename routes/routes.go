@@ -40,6 +40,26 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 			controllers.DeleteProduct(w, r, db)
 		}
 	}).Methods("GET", "PUT", "DELETE")
+
+	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetCollections(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetCollectionByID(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
+		controllers.CreateCollection(w, r, db)
+	}).Methods("POST")
+	
+	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.UpdateCollection(w, r, db)
+	}).Methods("PUT")
+	
+	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.DeleteCollection(w, r, db)
+	}).Methods("DELETE")
 	
 	return router
 }
