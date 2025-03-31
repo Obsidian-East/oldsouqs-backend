@@ -11,17 +11,16 @@ import (
 
 func SetupRoutes(db *mongo.Database) *mux.Router {
 	router := mux.NewRouter()
-	
-	// Signup route
+
+	// Auth routes
 	router.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
 		controllers.SignupHandler(w, r, db)
 	}).Methods("POST")
 
-	// Login route
 	router.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		controllers.LoginHandler(w, r, db)
 	}).Methods("POST")
-	
+
 	// Product routes
 	router.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -41,25 +40,34 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		}
 	}).Methods("GET", "PUT", "DELETE")
 
-	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
-		controllers.GetCollections(w, r, db)
-	}).Methods("GET")
-	
-	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
-		controllers.GetCollectionByID(w, r, db)
-	}).Methods("GET")
-	
-	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
-		controllers.CreateCollection(w, r, db)
+	// Get products by IDs
+	router.HandleFunc("/products/ids", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProductsByIDs(w, r, db)
 	}).Methods("POST")
-	
+
+	// Collection routes
+	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			controllers.GetCollections(w, r, db)
+		} else if r.Method == http.MethodPost {
+			controllers.CreateCollection(w, r, db)
+		}
+	}).Methods("GET", "POST")
+
 	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
-		controllers.UpdateCollection(w, r, db)
-	}).Methods("PUT")
-	
-	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
-		controllers.DeleteCollection(w, r, db)
-	}).Methods("DELETE")
+		if r.Method == http.MethodGet {
+			controllers.GetCollectionByID(w, r, db)
+		} else if r.Method == http.MethodPut {
+			controllers.UpdateCollection(w, r, db)
+		} else if r.Method == http.MethodDelete {
+			controllers.DeleteCollection(w, r, db)
+		}
+	}).Methods("GET", "PUT", "DELETE")
+
+	// Get products by collection ID
+	router.HandleFunc("/collections/{id}/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProductsByCollection(w, r, db)
+	}).Methods("GET")
 	
 	return router
 }

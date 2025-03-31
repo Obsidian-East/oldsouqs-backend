@@ -237,3 +237,86 @@ func formatProductResponse(product models.Product, isArabic bool) map[string]int
 		"image":        product.Image,
 	}
 }
+
+func GetProductsByIDs(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
+	var request struct {
+		ProductIds []string `json:"productIds"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	if len(request.ProductIds) == 0 {
+		http.Error(w, "No product IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	var objIDs []primitive.ObjectID
+	for _, id := range request.ProductIds {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(w, "Invalid product ID format", http.StatusBadRequest)
+			return
+		}
+		objIDs = append(objIDs, objID)
+	}
+
+	collection := db.Collection("products")
+	cursor, err := collection.Find(context.TODO(), bson.M{"_id": bson.M{"$in": objIDs}})
+	if err != nil {
+		http.Error(w, "Failed to retrieve products", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var products []models.Product
+	if err := cursor.All(context.TODO(), &products); err != nil {
+		http.Error(w, "Failed to parse products", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(products)
+}
+
+func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
+	vars := mux.Vars(r)
+	collectionID := vars["id"]
+
+	objID, err := primitive.ObjectIDFromHex(collectionID)
+	if err != nil {
+		http.Error(w, "Invalid collection ID format", http.StatusBadRequest)
+		return
+	}
+
+	collectionCollection := db.Collection("collections")
+	var collection models.Collection
+	err = collectionCollection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&collection)
+	if err != nil {
+		http.Error(w, "Collection not found", http.StatusNotFound)
+		return
+	}
+
+	if len(collection.ProductIds) == 0 {
+		json.NewEncoder(w).Encode([]models.Product{}) // Return empty array if no products
+		return
+	}
+
+	productCollection := db.Collection("products")
+	cursor, err := productCollection.Find(context.TODO(), bson.M{"_id": bson.M{"$in": collection.ProductIds}})
+	if err != nil {
+		http.Error(w, "Failed to retrieve products", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var products []models.Product
+	if err := cursor.All(context.TODO(), &products); err != nil {
+		http.Error(w, "Failed to parse products", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(products)
+}
+
