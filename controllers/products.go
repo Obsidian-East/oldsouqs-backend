@@ -65,31 +65,34 @@ func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	// Get the inserted product ID
 	insertedID := result.InsertedID.(primitive.ObjectID)
 
-	// If the product has a tag, try to find the corresponding collection
-	if product.Tag != "" {
-		var collection models.Collection
-		err := collectionCollection.FindOne(context.TODO(), bson.M{"collectionName": product.Tag}).Decode(&collection)
+	// Process multiple tags and update collections accordingly
+	if len(product.Tag) > 0 {
+		for _, tag := range product.Tag {
+			var collection models.Collection
+			err := collectionCollection.FindOne(context.TODO(), bson.M{"collectionName": tag}).Decode(&collection)
 
-		if err != nil { // Collection does not exist, create a new one
-			newCollection := models.Collection{
-				ID:              primitive.NewObjectID(),
-				CollectionName:  product.Tag,
-				ProductIds:      []primitive.ObjectID{insertedID},
-			}
-			_, err := collectionCollection.InsertOne(context.TODO(), newCollection)
-			if err != nil {
-				http.Error(w, "Failed to create collection", http.StatusInternalServerError)
-				return
-			}
-		} else { // Collection exists, update it
-			_, err := collectionCollection.UpdateOne(
-				context.TODO(),
-				bson.M{"_id": collection.ID},
-				bson.M{"$addToSet": bson.M{"productIds": insertedID}}, // Prevent duplicate IDs
-			)
-			if err != nil {
-				http.Error(w, "Failed to update collection", http.StatusInternalServerError)
-				return
+			if err != nil { // Collection does not exist, create a new one
+				newCollection := models.Collection{
+					ID:              primitive.NewObjectID(),
+					CollectionName:  tag,
+					ProductIds:      []primitive.ObjectID{insertedID},
+					ShowCollection:  true,
+				}
+				_, err := collectionCollection.InsertOne(context.TODO(), newCollection)
+				if err != nil {
+					http.Error(w, "Failed to create collection", http.StatusInternalServerError)
+					return
+				}
+			} else { // Collection exists, update it
+				_, err := collectionCollection.UpdateOne(
+					context.TODO(),
+					bson.M{"_id": collection.ID},
+					bson.M{"$addToSet": bson.M{"productIds": insertedID}}, // Prevent duplicate IDs
+				)
+				if err != nil {
+					http.Error(w, "Failed to update collection", http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 	}

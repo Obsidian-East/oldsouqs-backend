@@ -13,7 +13,7 @@ type Product struct {
 	DescriptionAr string			   `bson:"descriptionAr"`
 	Price 		  float64              `bson:"price"`
 	Image         string               `bson:"image"`
-	Tag			  string			   `bson:"tag"`
+	Tag			  []string			   `bson:"tag"`
 }
 
 type Collection struct {
