@@ -14,6 +14,7 @@ type Product struct {
 	Price 		  float64              `bson:"price"`
 	Image         string               `bson:"image"`
 	Tag			  []string			   `bson:"tag"`
+	stock		  int32				   `bson:"stock"`
 }
 
 type Collection struct {
