@@ -1,6 +1,7 @@
 package models
 
 import (
+	"time"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -14,7 +15,9 @@ type Product struct {
 	Price 		  float64              `bson:"price"`
 	Image         string               `bson:"image"`
 	Tag			  []string			   `bson:"tag"`
-	stock		  int32				   `bson:"stock"`
+	Stock		  int32				   `bson:"stock"`
+	CreatedAt	  time.Time			   `bson:"createdAt"`
+	UpdatedAt	  time.Time			   `bson:"updatedAt"`
 }
 
 type Collection struct {

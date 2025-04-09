@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"oldsouqs-backend/models"
 
@@ -55,6 +56,11 @@ func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
+	// Set timestamps
+	timestamp := time.Now()
+	product.CreatedAt = timestamp
+	product.UpdatedAt = timestamp
+
 	// Insert product into database
 	result, err := productCollection.InsertOne(context.TODO(), product)
 	if err != nil {
@@ -73,10 +79,10 @@ func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 			if err != nil { // Collection does not exist, create a new one
 				newCollection := models.Collection{
-					ID:              primitive.NewObjectID(),
-					CollectionName:  tag,
-					ProductIds:      []primitive.ObjectID{insertedID},
-					ShowCollection:  true,
+					ID:             primitive.NewObjectID(),
+					CollectionName: tag,
+					ProductIds:     []primitive.ObjectID{insertedID},
+					ShowCollection: true,
 				}
 				_, err := collectionCollection.InsertOne(context.TODO(), newCollection)
 				if err != nil {
@@ -183,6 +189,8 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
+	product.UpdatedAt = time.Now()
+
 	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, bson.M{"$set": product})
 	if err != nil {
 		http.Error(w, "Failed to update product", http.StatusInternalServerError)
@@ -220,21 +228,29 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 func formatProductResponse(product models.Product, isArabic bool) map[string]interface{} {
 	if isArabic {
 		return map[string]interface{}{
-			"id":           product.ID,
-			"sku":          product.Sku,
-			"title":        product.TitleAr,
-			"description":  product.DescriptionAr,
-			"price":        product.Price,
-			"image":        product.Image,
+			"id":            product.ID,
+			"sku":           product.Sku,
+			"titleAr":       product.TitleAr,
+			"descriptionAr": product.DescriptionAr,
+			"price":         product.Price,
+			"image":         product.Image,
+			"createdAt":     product.CreatedAt.Format(time.RFC3339),
+			"updatedAt":     product.UpdatedAt.Format(time.RFC3339),
+			"stock":         product.Stock,
+			"tag":           product.Tag,
 		}
 	}
 	return map[string]interface{}{
-		"id":           product.ID,
-		"sku":          product.Sku,
-		"title":        product.Title,
-		"description":  product.Description,
-		"price":        product.Price,
-		"image":        product.Image,
+		"id":          product.ID,
+		"sku":         product.Sku,
+		"title":       product.Title,
+		"description": product.Description,
+		"price":       product.Price,
+		"image":       product.Image,
+		"createdAt":   product.CreatedAt.Format(time.RFC3339),
+		"updatedAt":   product.UpdatedAt.Format(time.RFC3339),
+		"stock":       product.Stock,
+		"tag":         product.Tag,
 	}
 }
 
@@ -279,4 +295,3 @@ func GetProductsByIDs(w http.ResponseWriter, r *http.Request, db *mongo.Database
 
 	json.NewEncoder(w).Encode(products)
 }
-
