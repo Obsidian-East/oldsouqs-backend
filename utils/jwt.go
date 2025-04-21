@@ -1,8 +1,13 @@
 package utils
 
 import (
+	"context"
+	"strings"
 	"time"
+	"net/http"
+
 	"github.com/dgrijalva/jwt-go"
+
 	"oldsouqs-backend/models"
 	"os"
 	"log"
@@ -31,4 +36,30 @@ func GenerateJWT(user models.User) (string, error) {
 	}
 
 	return signedToken, nil
+}
+
+func AuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        tokenStr := r.Header.Get("Authorization")
+        if tokenStr == "" {
+            http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+            return
+        }
+
+        tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
+
+        claims := &jwt.StandardClaims{}
+        token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+            return jwtKey, nil
+        })
+
+        if err != nil || !token.Valid {
+            http.Error(w, "Invalid token", http.StatusUnauthorized)
+            return
+        }
+
+        // Token is valid, set context for later use
+        ctx := context.WithValue(r.Context(), "userID", claims.Subject)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
 }
