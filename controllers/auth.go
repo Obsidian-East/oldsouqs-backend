@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func validate(user models.User) string {
@@ -83,8 +84,6 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	fmt.Println("Received user:", user)
-
 	// Get users collection
 	userCollection := db.Collection("users")
 
@@ -113,11 +112,26 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		fmt.Println("Error inserting user:", err)
 		return
 	}
-	fmt.Println("Inserted user ID:", result.InsertedID)
 
-	fmt.Println("User created successfully:", user.Email)
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+	// Get the inserted user ID and attach it to the user struct
+	user.ID = result.InsertedID.(primitive.ObjectID)
+
+
+	// Generate JWT token
+	token, err := utils.GenerateJWT(user)
+	if err != nil {
+		http.Error(w, "Could not generate token", http.StatusInternalServerError)
+		fmt.Println("Error generating token:", err)
+		return
+	}
+
+	// Respond with token and userId
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "User created successfully",
+		"token":   token,
+		"userId":  user.ID.Hex(),
+	})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
@@ -157,6 +171,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	response := map[string]string{
 		"message": "Login successful",
 		"token":   token,
+		"userId": user.ID.Hex(),
 	}
 	json.NewEncoder(w).Encode(response)
 }
