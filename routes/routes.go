@@ -107,6 +107,5 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.DeleteOrder(w, r, db)
 	}).Methods("DELETE")
 	
-	
 	return router
 }
