@@ -86,6 +86,7 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.RemoveFromCart(w, r, db)
 	}).Methods(http.MethodDelete)
 
+	// order
 	router.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetAllOrders(w, r, db)
 	}).Methods("GET")
