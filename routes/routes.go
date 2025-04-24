@@ -21,6 +21,23 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.LoginHandler(w, r, db)
 	}).Methods("POST")
 
+	// User routes
+	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetUsers(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetUserByID(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.UpdateUser(w, r, db)
+	}).Methods("PUT")
+	
+	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.DeleteUser(w, r, db)
+	}).Methods("DELETE")	
+
 	// Product routes
 	router.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
