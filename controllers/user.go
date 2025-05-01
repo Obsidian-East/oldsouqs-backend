@@ -21,6 +21,7 @@ func validateUser(user models.User) string {
 }
 
 func GetUsers(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
+	enableCORS(w)
 	cursor, err := db.Collection("users").Find(context.TODO(), bson.M{})
 	if err != nil {
 		http.Error(w, "Error fetching users", http.StatusInternalServerError)
@@ -38,6 +39,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 }
 
 func GetUserByID(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
+	enableCORS(w)
 	params := mux.Vars(r)
 	id, err := primitive.ObjectIDFromHex(params["userId"])
 	if err != nil {
@@ -108,4 +110,10 @@ func DeleteUser(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
+}
+
+func enableCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
