@@ -29,6 +29,7 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
+	// Assign a new ID to the wishlist item
 	item.ID = primitive.NewObjectID()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -36,26 +37,30 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	wishlistCollection := db.Collection("wishlists")
 
-	now := primitive.NewDateTimeFromTime(time.Now())
-
 	filter := bson.M{"userId": userID}
 	update := bson.M{
 		"$push": bson.M{"wishlistItems": item},
 		"$setOnInsert": bson.M{
 			"userId":    userID,
-			"createdAt": now,
+			"createdAt": primitive.NewDateTimeFromTime(time.Now()),
 		},
 	}
 	opts := options.Update().SetUpsert(true)
 
-	_, err := wishlistCollection.UpdateOne(ctx, filter, update, opts)
+	result, err := wishlistCollection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {
 		http.Error(w, "Failed to add to wishlist", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode("Item added to wishlist")
+	// Optional: return debug info for confirmation
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":       "Item added to wishlist",
+		"matchedCount":  result.MatchedCount,
+		"modifiedCount": result.ModifiedCount,
+		"upsertedCount": result.UpsertedCount,
+		"upsertedID":    result.UpsertedID,
+	})
 }
 
 // Get wishlist items for a specific user
