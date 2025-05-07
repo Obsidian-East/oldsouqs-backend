@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -36,8 +36,16 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	wishlistCollection := db.Collection("wishlists")
 
+	now := primitive.NewDateTimeFromTime(time.Now())
+
 	filter := bson.M{"userId": userID}
-	update := bson.M{"$push": bson.M{"wishlistItems": item}}
+	update := bson.M{
+		"$push": bson.M{"wishlistItems": item},
+		"$setOnInsert": bson.M{
+			"userId":    userID,
+			"createdAt": now,
+		},
+	}
 	opts := options.Update().SetUpsert(true)
 
 	_, err := wishlistCollection.UpdateOne(ctx, filter, update, opts)
