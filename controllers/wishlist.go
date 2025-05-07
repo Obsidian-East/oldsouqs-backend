@@ -65,8 +65,9 @@ func GetWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	var wishlist models.Wishlist
 	err := wishlistCollection.FindOne(ctx, bson.M{"userId": userID}).Decode(&wishlist)
-	if err != nil {
-		http.Error(w, "Wishlist not found", http.StatusNotFound)
+	if err == mongo.ErrNoDocuments {
+		// No wishlist yet, return empty list instead of error
+		json.NewEncoder(w).Encode([]models.WishlistItem{})
 		return
 	}
 
