@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
+	"strings"
+	"unicode"
 
 	"oldsouqs-backend/models"
 	"oldsouqs-backend/utils"
@@ -17,23 +18,28 @@ import (
 )
 
 func validate(user models.User) string {
-	// Check minimum length
-	if len(user.Password) < 10 {
+	// Trim spaces
+	email := strings.TrimSpace(user.Email)
+	password := strings.TrimSpace(user.Password)
+	phone := strings.TrimSpace(user.PhoneNumber)
+
+	// Basic password length check
+	if len(password) < 10 {
 		return "Password must contain at least 10 characters"
 	}
 
-	// Check for at least one uppercase letter, one number, and one special character
+	// Check password strength manually
 	hasUpper := false
 	hasDigit := false
 	hasSpecial := false
 
-	for _, char := range user.Password {
+	for _, char := range password {
 		switch {
-		case char >= 'A' && char <= 'Z':
+		case unicode.IsUpper(char):
 			hasUpper = true
-		case char >= '0' && char <= '9':
+		case unicode.IsDigit(char):
 			hasDigit = true
-		case (char >= '!' && char <= '/') || (char >= ':' && char <= '@') || (char >= '[' && char <= '`') || (char >= '{' && char <= '~'):
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
 			hasSpecial = true
 		}
 	}
@@ -48,17 +54,13 @@ func validate(user models.User) string {
 		return "Password must contain at least one special character"
 	}
 
-	// Email validation
-	emailRegex := `^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`
-	matched, _ := regexp.MatchString(emailRegex, user.Email)
-	if !matched {
+	// Simple email format check
+	if !strings.Contains(email, "@") || !strings.Contains(email, ".") {
 		return "Invalid email format"
 	}
 
-	// Phone number validation
-	phoneRegex := `^(?:\+961|00961)[0-9]{8}$`
-	matched, _ = regexp.MatchString(phoneRegex, user.PhoneNumber)
-	if !matched {
+	// Simple phone number check (Lebanese format only)
+	if !(strings.HasPrefix(phone, "+961") || strings.HasPrefix(phone, "00961")) || len(phone) != 12 {
 		return "Phone number must start with +961 or 00961 followed by 8 digits"
 	}
 

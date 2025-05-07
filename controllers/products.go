@@ -230,8 +230,8 @@ func formatProductResponse(product models.Product, isArabic bool) map[string]int
 		return map[string]interface{}{
 			"id":            product.ID,
 			"sku":           product.Sku,
-			"titleAr":       product.TitleAr,
-			"descriptionAr": product.DescriptionAr,
+			"title":         product.TitleAr,
+			"description":   product.DescriptionAr,
 			"price":         product.Price,
 			"image":         product.Image,
 			"createdAt":     product.CreatedAt.Format(time.RFC3339),
