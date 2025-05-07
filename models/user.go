@@ -9,7 +9,7 @@ type User struct {
 	PhoneNumber string             `bson:"phone_number" json:"phone_number"`
 	Location    string             `bson:"location" json:"location"`
 	Email       string             `bson:"email" json:"email"`
-	Password    string             `bson:"password" json:"-"`
+	Password    string             `bson:"password" json:"password"`
   }
   
 
