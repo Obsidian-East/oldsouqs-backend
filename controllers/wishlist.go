@@ -12,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Add item to wishlist
@@ -29,7 +28,7 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	// Assign a new ID to the wishlist item
+	// Assign a new ObjectID to the WishlistItem
 	item.ID = primitive.NewObjectID()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -37,29 +36,47 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	wishlistCollection := db.Collection("wishlists")
 
-	filter := bson.M{"userId": userID}
-	update := bson.M{
-		"$push": bson.M{"wishlistItems": item},
-		"$setOnInsert": bson.M{
-			"userId":    userID,
-			"createdAt": primitive.NewDateTimeFromTime(time.Now()),
-		},
-	}
-	opts := options.Update().SetUpsert(true)
+	// Try to find an existing wishlist
+	var existingWishlist models.Wishlist
+	err := wishlistCollection.FindOne(ctx, bson.M{"userId": userID}).Decode(&existingWishlist)
 
-	result, err := wishlistCollection.UpdateOne(ctx, filter, update, opts)
-	if err != nil {
-		http.Error(w, "Failed to add to wishlist", http.StatusInternalServerError)
+	if err == mongo.ErrNoDocuments {
+		// No wishlist yet, create a new one with the item
+		newWishlist := models.Wishlist{
+			ID:            primitive.NewObjectID(),
+			UserID:        userID,
+			CreatedAt:     primitive.NewDateTimeFromTime(time.Now()),
+			WishlistItems: []models.WishlistItem{item},
+		}
+
+		_, insertErr := wishlistCollection.InsertOne(ctx, newWishlist)
+		if insertErr != nil {
+			http.Error(w, "Failed to create wishlist", http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Wishlist created and item added",
+		})
+		return
+	} else if err != nil {
+		http.Error(w, "Error checking existing wishlist", http.StatusInternalServerError)
 		return
 	}
 
-	// Optional: return debug info for confirmation
+	// If wishlist exists, update it by pushing the item
+	update := bson.M{
+		"$push": bson.M{"wishlistItems": item},
+	}
+
+	_, updateErr := wishlistCollection.UpdateOne(ctx, bson.M{"userId": userID}, update)
+	if updateErr != nil {
+		http.Error(w, "Failed to add item to wishlist", http.StatusInternalServerError)
+		return
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":       "Item added to wishlist",
-		"matchedCount":  result.MatchedCount,
-		"modifiedCount": result.ModifiedCount,
-		"upsertedCount": result.UpsertedCount,
-		"upsertedID":    result.UpsertedID,
+		"message": "Item added to existing wishlist",
 	})
 }
 
