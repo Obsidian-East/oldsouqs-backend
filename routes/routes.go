@@ -123,6 +123,20 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/orders/{orderId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.DeleteOrder(w, r, db)
 	}).Methods("DELETE")
+
+	//Wishlist
+	router.HandleFunc("/wishlist", func(w http.ResponseWriter, r *http.Request) {
+		controllers.AddToWishlist(w, r, db)
+	}).Methods("POST")
+	
+	router.HandleFunc("/wishlist", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetWishlist(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/wishlist/{itemId}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.RemoveFromWishlist(w, r, db)
+	}).Methods("DELETE")
+	
 	
 	return router
 }
