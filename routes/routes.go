@@ -25,18 +25,18 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetUsers(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetUserByID(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.UpdateUser(w, r, db)
 	}).Methods("PUT")
-	
+
 	router.HandleFunc("/users/{userId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.DeleteUser(w, r, db)
-	}).Methods("DELETE")	
+	}).Methods("DELETE")
 
 	// Product routes
 	router.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +61,19 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/products/ids", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetProductsByIDs(w, r, db)
 	}).Methods("POST")
+
+	// Add Arabic routes
+	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProducts(w, r, db)
+	}).Methods("GET")
+
+	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.CreateProduct(w, r, db)
+	}).Methods("POST")
+
+	router.HandleFunc("/ar/products/{id}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProduct(w, r, db)
+	}).Methods("GET")
 
 	// Collection routes
 	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
@@ -90,15 +103,15 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/cart", func(w http.ResponseWriter, r *http.Request) {
 		controllers.AddToCart(w, r, db)
 	}).Methods(http.MethodPost)
-	
+
 	router.HandleFunc("/cart", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetCart(w, r, db)
 	}).Methods(http.MethodGet)
-	
+
 	router.HandleFunc("/cart/{productId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.UpdateCartItem(w, r, db)
 	}).Methods(http.MethodPut)
-	
+
 	router.HandleFunc("/cart/{productId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.RemoveFromCart(w, r, db)
 	}).Methods(http.MethodDelete)
@@ -107,36 +120,35 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetAllOrders(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/orders/{orderId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetOrder(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/orders/{userId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.CreateOrder(w, r, db)
 	}).Methods("POST")
-	
+
 	router.HandleFunc("/orders/{orderId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.UpdateOrder(w, r, db)
 	}).Methods("PUT")
-	
+
 	router.HandleFunc("/orders/{orderId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.DeleteOrder(w, r, db)
 	}).Methods("DELETE")
 
-	//Wishlist
+	// Wishlist
 	router.HandleFunc("/wishlist", func(w http.ResponseWriter, r *http.Request) {
 		controllers.AddToWishlist(w, r, db)
 	}).Methods("POST")
-	
+
 	router.HandleFunc("/wishlist", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetWishlist(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/wishlist/{itemId}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.RemoveFromWishlist(w, r, db)
 	}).Methods("DELETE")
-	
-	
+
 	return router
 }
