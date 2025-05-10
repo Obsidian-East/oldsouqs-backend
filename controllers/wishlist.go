@@ -12,9 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Add item to wishlist
+// Add to Wishlist
 func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	var item models.WishlistItem
 	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
@@ -23,12 +24,11 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	userID := r.URL.Query().Get("userId")
-	if userID == "" {
-		http.Error(w, "Missing userId", http.StatusBadRequest)
+	if userID == "" || item.ProductID == "" {
+		http.Error(w, "Missing userId or productId", http.StatusBadRequest)
 		return
 	}
 
-	// Assign a new ObjectID to the WishlistItem
 	item.ID = primitive.NewObjectID()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -36,51 +36,29 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	wishlistCollection := db.Collection("wishlists")
 
-	// Try to find an existing wishlist
-	var existingWishlist models.Wishlist
-	err := wishlistCollection.FindOne(ctx, bson.M{"userId": userID}).Decode(&existingWishlist)
-
-	if err == mongo.ErrNoDocuments {
-		// No wishlist yet, create a new one with the item
-		newWishlist := models.Wishlist{
-			ID:            primitive.NewObjectID(),
-			UserID:        userID,
-			CreatedAt:     primitive.NewDateTimeFromTime(time.Now()),
-			WishlistItems: []models.WishlistItem{item},
-		}
-
-		_, insertErr := wishlistCollection.InsertOne(ctx, newWishlist)
-		if insertErr != nil {
-			http.Error(w, "Failed to create wishlist", http.StatusInternalServerError)
-			return
-		}
-
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "Wishlist created and item added",
-		})
-		return
-	} else if err != nil {
-		http.Error(w, "Error checking existing wishlist", http.StatusInternalServerError)
-		return
-	}
-
-	// If wishlist exists, update it by pushing the item
+	filter := bson.M{"userId": userID}
 	update := bson.M{
 		"$push": bson.M{"wishlistItems": item},
+		"$setOnInsert": bson.M{
+			"userId":    userID,
+			"createdAt": primitive.NewDateTimeFromTime(time.Now()),
+		},
 	}
+	opts := options.Update().SetUpsert(true)
 
-	_, updateErr := wishlistCollection.UpdateOne(ctx, bson.M{"userId": userID}, update)
-	if updateErr != nil {
-		http.Error(w, "Failed to add item to wishlist", http.StatusInternalServerError)
+	_, err := wishlistCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		http.Error(w, "Database update failed", http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Item added to existing wishlist",
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Item added successfully",
 	})
 }
 
-// Get wishlist items for a specific user
+// Get Wishlist
 func GetWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	userID := r.URL.Query().Get("userId")
 	if userID == "" {
@@ -91,13 +69,14 @@ func GetWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	wishlistCollection := db.Collection("wishlists")
-
 	var wishlist models.Wishlist
-	err := wishlistCollection.FindOne(ctx, bson.M{"userId": userID}).Decode(&wishlist)
+	collection := db.Collection("wishlists")
+	err := collection.FindOne(ctx, bson.M{"userId": userID}).Decode(&wishlist)
 	if err == mongo.ErrNoDocuments {
-		// No wishlist yet, return empty list instead of error
 		json.NewEncoder(w).Encode([]models.WishlistItem{})
+		return
+	} else if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
