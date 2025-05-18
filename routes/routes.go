@@ -62,6 +62,19 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.GetProductsByIDs(w, r, db)
 	}).Methods("POST")
 
+	// Add Arabic routes
+	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProducts(w, r, db)
+	}).Methods("GET")
+
+	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.CreateProduct(w, r, db)
+	}).Methods("POST")
+
+	router.HandleFunc("/ar/products/{id}", func(w http.ResponseWriter, r *http.Request) {
+		controllers.GetProduct(w, r, db)
+	}).Methods("GET")
+
 	// Collection routes
 	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -124,7 +137,7 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.DeleteOrder(w, r, db)
 	}).Methods("DELETE")
 
-	//Wishlist
+	// Wishlist
 	router.HandleFunc("/wishlist", func(w http.ResponseWriter, r *http.Request) {
 		controllers.AddToWishlist(w, r, db)
 	}).Methods("POST")

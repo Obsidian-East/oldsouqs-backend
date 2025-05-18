@@ -38,7 +38,7 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	filter := bson.M{"userId": userID}
 	update := bson.M{
-		"$push": bson.M{"wishlistItems": item},
+		"$addToSet": bson.M{"wishlistItems": item},
 		"$setOnInsert": bson.M{
 			"userId":    userID,
 			"createdAt": primitive.NewDateTimeFromTime(time.Now()),
