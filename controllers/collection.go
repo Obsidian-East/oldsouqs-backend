@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"oldsouqs-backend/models"
 
@@ -158,7 +159,7 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 	}
 
 	if len(collection.ProductIds) == 0 {
-		json.NewEncoder(w).Encode([]models.Product{}) // Return empty array if no products
+		json.NewEncoder(w).Encode([]models.Product{})
 		return
 	}
 
@@ -176,5 +177,40 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 		return
 	}
 
-	json.NewEncoder(w).Encode(products)
+	// Check if Arabic route
+	isArabic := strings.HasPrefix(r.URL.Path, "/ar/")
+
+	// Build final response
+	type TranslatedProduct struct {
+		ID          primitive.ObjectID `json:"id"`
+		Sku         string             `json:"sku"`
+		Title       string             `json:"title"`
+		Description string             `json:"description"`
+		Price       float64            `json:"price"`
+		Image       string             `json:"image"`
+		Tag         []string           `json:"tag"`
+		Stock       int32              `json:"stock"`
+	}
+
+	var response []TranslatedProduct
+	for _, p := range products {
+		product := TranslatedProduct{
+			ID:          p.ID,
+			Sku:         p.Sku,
+			Title:       p.Title,
+			Description: p.Description,
+			Price:       p.Price,
+			Image:       p.Image,
+			Tag:         p.Tag,
+			Stock:       p.Stock,
+		}
+		if isArabic {
+			product.Title = p.TitleAr
+			product.Description = p.DescriptionAr
+		}
+		response = append(response, product)
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
+
