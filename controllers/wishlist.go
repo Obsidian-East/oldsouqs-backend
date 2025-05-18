@@ -16,7 +16,6 @@ import (
 )
 
 // Add to Wishlist
-// Add to Wishlist (with prevention of duplicates)
 func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	var item models.WishlistItem
 	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
@@ -39,7 +38,7 @@ func AddToWishlist(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	filter := bson.M{"userId": userID}
 	update := bson.M{
-		"$addToSet": bson.M{"wishlistItems": item}, // <--- Prevents duplicates
+		"$push": bson.M{"wishlistItems": item},
 		"$setOnInsert": bson.M{
 			"userId":    userID,
 			"createdAt": primitive.NewDateTimeFromTime(time.Now()),
