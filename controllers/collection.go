@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"oldsouqs-backend/models"
 
@@ -190,6 +191,8 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 		Image       string             `json:"image"`
 		Tag         []string           `json:"tag"`
 		Stock       int32              `json:"stock"`
+		CreatedAt   time.Time          `json:"createdAt"`
+		UpdatedAt   time.Time          `json:"updatedAt"`
 	}
 
 	var response []TranslatedProduct
@@ -203,6 +206,8 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 			Image:       p.Image,
 			Tag:         p.Tag,
 			Stock:       p.Stock,
+			CreatedAt:   p.CreatedAt,
+			UpdatedAt:   p.UpdatedAt,
 		}
 		if isArabic {
 			product.Title = p.TitleAr
