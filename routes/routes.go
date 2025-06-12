@@ -62,14 +62,14 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.GetProductsByIDs(w, r, db)
 	}).Methods("POST")
 
+	router.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
+		controllers.CreateProduct(w, r, db)
+	}).Methods("POST")
+
 	// Add Arabic routes
 	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetProducts(w, r, db)
 	}).Methods("GET")
-
-	router.HandleFunc("/ar/products", func(w http.ResponseWriter, r *http.Request) {
-		controllers.CreateProduct(w, r, db)
-	}).Methods("POST")
 
 	router.HandleFunc("/ar/products/{id}", func(w http.ResponseWriter, r *http.Request) {
 		controllers.GetProduct(w, r, db)
