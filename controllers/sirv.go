@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -18,12 +19,15 @@ const (
 func getSirvToken() (string, error) {
 	client := &http.Client{}
 
-	data := "clientId=YJSw6mQ8yagO4n37YEXPhKto3kE&clientSecret=i0G1wKuzM+qa7VLV3PCaZJjwyONW+J4bdZNoCM+WUgpSdFktUZNR3SqDDLFUxtvrm0/HVLOxlPRwORLl9L70xg=="
-	req, err := http.NewRequest("POST", "https://api.sirv.com/v2/token", strings.NewReader(data))
+	data := url.Values{}
+	data.Set("clientId", "YJSw6mQ8yagO4n37YEXPhKto3kE")
+	data.Set("clientSecret", "i0G1wKuzM+qa7VLV3PCaZJjwyONW+J4bdZNoCM+WUgpSdFktUZNR3SqDDLFUxtvrm0/HVLOxlPRwORLl9L70xg==")
+
+	req, err := http.NewRequest("POST", "https://api.sirv.com/v2/token", strings.NewReader(data.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("failed to create token request: %v", err)
+		return "", fmt.Errorf("failed to create request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded") // ✅ MUST HAVE
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -32,7 +36,7 @@ func getSirvToken() (string, error) {
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	fmt.Println("Sirv raw response:", string(bodyBytes)) // 🔍 log response
+	fmt.Println("Sirv raw response:", string(bodyBytes)) // ✅ See what's returned
 
 	var result struct {
 		Token string `json:"token"`
@@ -41,7 +45,10 @@ func getSirvToken() (string, error) {
 		return "", fmt.Errorf("failed to parse token: %v", err)
 	}
 
-	fmt.Println("Sirv token:", result.Token)
+	if result.Token == "" {
+		return "", fmt.Errorf("Sirv token is empty")
+	}
+
 	return result.Token, nil
 }
 
@@ -76,7 +83,12 @@ func uploadToSirv(filePath, fileName, token string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("Sirv upload failed: %s", string(respBody))
 	}
-	fmt.Println("Token:", token)
+	if len(token) >= 10 {
+		fmt.Println("Uploading to Sirv with token:", token[:10]+"...")
+	} else {
+		fmt.Println("Token is empty or too short:", token)
+	}
+
 	fmt.Println("Upload URL:", url)
 	fmt.Println("File name:", fileName)
 	fmt.Println("Upload headers:", req.Header)
