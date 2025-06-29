@@ -52,15 +52,16 @@ func uploadToSirv(filePath, fileName, token string) error {
 	}
 	defer file.Close()
 
-	uploadURL := "https://api.sirv.com/v2/files/upload?filename=/Products/" + fileName
-
-	req, err := http.NewRequest("POST", uploadURL, file)
+	url := "https://api.sirv.com/v2/files/upload?filename=/Products/" + fileName
+	req, err := http.NewRequest("POST", url, file)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	fmt.Println("Sirv token:", token)
+
+	req.Header.Set("Authorization", "Bearer "+token) // ✅ Correct casing
 	req.Header.Set("Content-Type", "application/octet-stream")
+
+	fmt.Println("Uploading to Sirv with token:", token[:10]+"...")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -69,10 +70,16 @@ func uploadToSirv(filePath, fileName, token string) error {
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
+	fmt.Println("Upload response:", string(respBody)) // 🔍 See Sirv response
+
 	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Sirv upload failed: %s", string(body))
+		return fmt.Errorf("Sirv upload failed: %s", string(respBody))
 	}
+	fmt.Println("Token:", token)
+	fmt.Println("Upload URL:", url)
+	fmt.Println("File name:", fileName)
+	fmt.Println("Upload headers:", req.Header)
 
 	return nil
 }
