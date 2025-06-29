@@ -20,6 +20,8 @@ func getSirvToken() (string, error) {
 	data := url.Values{}
 	data.Set("clientId", SirvClientID)
 	data.Set("clientSecret", SirvClientSecret)
+	fmt.Println("Client ID:", SirvClientID)
+	fmt.Println("Client Secret:", SirvClientSecret)
 
 	resp, err := http.PostForm("https://api.sirv.com/v2/token", data)
 	if err != nil {
@@ -50,6 +52,7 @@ func uploadToSirv(filePath, fileName, token string) error {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	fmt.Println("Sirv token:", token)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	client := &http.Client{}
