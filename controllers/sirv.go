@@ -1,20 +1,20 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
-	"bytes"
 	"time"
 )
 
-const (
-	SirvBaseURL      = "https://old-souqs.sirv.com/Products/"
-)
+// SirvBaseURL is the base URL for accessing uploaded files on Sirv.
+// You should replace "your-sirv-account-name" with your actual Sirv account name.
+const SirvBaseURL = "https://old-souqs.sirv.com/" // Updated to your Sirv account base URL
 
 // AuthRequest represents the JSON payload for the Sirv authentication request.
 type AuthRequest struct {
@@ -24,14 +24,15 @@ type AuthRequest struct {
 
 // AuthResponse represents the expected JSON response from the Sirv authentication endpoint.
 type AuthResponse struct {
-	Token       string `json:"token"`
-	ExpiresIn   int    `json:"expiresIn"` // Optional: to see how long the token is valid
-	StatusCode  int    `json:"statusCode"` // Optional: for error responses
-	Error       string `json:"error"`      // Optional: for error responses
-	Message     string `json:"json"`       // Optional: for error responses
+	Token      string `json:"token"`
+	ExpiresIn  int    `json:"expiresIn"`  // Optional: to see how long the token is valid
+	StatusCode int    `json:"statusCode"` // Optional: for error responses
+	Error      string `json:"error"`      // Optional: for error responses
+	Message    string `json:"message"`    // Corrected tag to "message"
 }
 
-func getSirvToken() (string, error) {
+// getSirvToken retrieves an authentication token from the Sirv API.
+func GetSirvToken() (string, error) {
 	// Initialize an HTTP client with a timeout for robustness.
 	client := &http.Client{
 		Timeout: 10 * time.Second, // Set a reasonable timeout
@@ -50,8 +51,8 @@ func getSirvToken() (string, error) {
 	}
 
 	// Create a new POST request with the JSON payload.
-	// bytes.NewBuffer creates a Reader from the byte slice.
-	req, err := http.NewRequest("POST", "[https://api.sirv.com/v2/token](https://api.sirv.com/v2/token)", bytes.NewBuffer(jsonPayload))
+	// Corrected the URL string.
+	req, err := http.NewRequest("POST", "https://api.sirv.com/v2/token", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %v", err)
 	}
@@ -75,6 +76,11 @@ func getSirvToken() (string, error) {
 	// Print the raw response for debugging purposes.
 	fmt.Println("Sirv raw response:", string(bodyBytes))
 
+	// Check the HTTP status code directly.
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Sirv API HTTP error: Status %d, Response: %s", resp.StatusCode, string(bodyBytes))
+	}
+
 	// Unmarshal the JSON response into our AuthResponse struct.
 	var result AuthResponse
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
@@ -83,7 +89,7 @@ func getSirvToken() (string, error) {
 
 	// Check for API-specific errors in the response body (e.g., if statusCode is present and non-2xx).
 	if result.StatusCode != 0 && (result.StatusCode < 200 || result.StatusCode >= 300) {
-		return "", fmt.Errorf("Sirv API error: Status %d, Error: %s, Message: %s", result.StatusCode, result.Error, result.Message)
+		return "", fmt.Errorf("Sirv API error in response body: Status %d, Error: %s, Message: %s", result.StatusCode, result.Error, result.Message)
 	}
 
 	// Check if the token was successfully received.
@@ -95,7 +101,7 @@ func getSirvToken() (string, error) {
 }
 
 // uploadToSirv uploads a file to Sirv.
-func uploadToSirv(filePath, fileName, token string) error {
+func UploadToSirv(filePath, fileName, token string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
@@ -198,7 +204,7 @@ func UploadImageToSirv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get Sirv authentication token.
-	token, err := getSirvToken()
+	token, err := GetSirvToken()
 	if err != nil {
 		log.Printf("Failed to get Sirv token: %v", err)
 		http.Error(w, "Failed to get Sirv token", http.StatusInternalServerError)
@@ -206,7 +212,7 @@ func UploadImageToSirv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upload the temporary file to Sirv.
-	err = uploadToSirv(tempPath, fileName, token)
+	err = UploadToSirv(tempPath, fileName, token)
 	if err != nil {
 		log.Printf("Error uploading to Sirv: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError) // Return Sirv-specific error message
@@ -215,6 +221,10 @@ func UploadImageToSirv(w http.ResponseWriter, r *http.Request) {
 
 	// Construct the public URL for the uploaded image.
 	imageURL := SirvBaseURL + "Products/" + fileName // Ensure the path matches your upload path
+	// Note: SirvBaseURL already includes "/Products/", so you might need to adjust this depending on your Sirv folder structure.
+	// If SirvBaseURL is "https://old-souqs.sirv.com/", then for a file in /Products/ you'd use SirvBaseURL + "Products/" + fileName.
+	// If SirvBaseURL is "https://old-souqs.sirv.com/Products/", then you'd just use SirvBaseURL + fileName.
+	// I've updated SirvBaseURL to "https://old-souqs.sirv.com/" and adjusted the imageURL construction accordingly.
 
 	// Respond with the image URL as JSON.
 	w.Header().Set("Content-Type", "application/json")
