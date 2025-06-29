@@ -154,5 +154,8 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.RemoveFromWishlist(w, r, db)
 	}).Methods("DELETE")
 
+	//Sirv Handle
+	router.HandleFunc("/api/upload", controllers.UploadImageToSirv).Methods("POST")
+
 	return router
 }
