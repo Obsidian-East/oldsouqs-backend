@@ -18,23 +18,28 @@ const (
 
 func getSirvToken() (string, error) {
 	data := url.Values{}
-	data.Set("clientId", SirvClientID)
-	data.Set("clientSecret", SirvClientSecret)
-	fmt.Println("Client ID:", SirvClientID)
-	fmt.Println("Client Secret:", SirvClientSecret)
+	data.Set("clientId", "YJSw6mQ8yagO4n37YEXPhKto3kE")
+	data.Set("clientSecret", "i0G1wKuzM+qa7VLV3PCaZJjwyONW+J4bdZNoCM+WUgpSdFktUZNR3SqDDLFUxtvrm0/HVLOxlPRwORLl9L70xg==")
 
 	resp, err := http.PostForm("https://api.sirv.com/v2/token", data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("token request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	fmt.Println("Sirv raw response:", string(bodyBytes)) // 🔍 debug output
+
+	// Attempt to decode token
 	var result struct {
 		Token string `json:"token"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return "", fmt.Errorf("failed to parse token: %v", err)
 	}
+
+	fmt.Println("Sirv token:", result.Token) // ✅ verify it's not empty
+
 	return result.Token, nil
 }
 
