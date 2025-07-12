@@ -40,19 +40,21 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 
 	// Product routes
 	router.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			controllers.GetProducts(w, r, db)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			controllers.CreateProduct(w, r, db)
 		}
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/products/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			controllers.GetProduct(w, r, db)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			controllers.UpdateProduct(w, r, db)
-		} else if r.Method == http.MethodDelete {
+		case http.MethodDelete:
 			controllers.DeleteProduct(w, r, db)
 		}
 	}).Methods("GET", "PUT", "DELETE")
@@ -77,19 +79,21 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 
 	// Collection routes
 	router.HandleFunc("/collections", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			controllers.GetCollections(w, r, db)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			controllers.CreateCollection(w, r, db)
 		}
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/collections/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			controllers.GetCollectionByID(w, r, db)
-		} else if r.Method == http.MethodPut {
+		case http.MethodPut:
 			controllers.UpdateCollection(w, r, db)
-		} else if r.Method == http.MethodDelete {
+		case http.MethodDelete:
 			controllers.DeleteCollection(w, r, db)
 		}
 	}).Methods("GET", "PUT", "DELETE")
@@ -154,7 +158,7 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 		controllers.RemoveFromWishlist(w, r, db)
 	}).Methods("DELETE")
 
-	//Sirv Handle
+	// Sirv Handle
 	router.HandleFunc("/api/upload", controllers.UploadImageToSirv).Methods("POST")
 
 	return router
