@@ -109,6 +109,9 @@ func CreateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 }
 
 func GetProducts(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
+	isArabic := strings.Contains(r.URL.Path, "/ar")
+	isAdmin := r.URL.Query().Get("isAdmin") == "true"
+
 	collection := db.Collection("products")
 	cursor, err := collection.Find(context.TODO(), bson.M{})
 	if err != nil {
@@ -123,14 +126,17 @@ func GetProducts(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	// Check if the request contains "/ar"
-	isArabic := strings.Contains(r.URL.Path, "/ar")
-
-	var response []map[string]interface{}
-	for _, product := range products {
-		response = append(response, formatProductResponse(product, isArabic))
+	if isAdmin {
+		// Return full data for admin
+		json.NewEncoder(w).Encode(products)
+		return
 	}
 
+	// Format for user-facing API
+	var response []map[string]interface{}
+	for _, product := range products {
+		response = append(response, formatProductResponse(product, isArabic, false))
+	}
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -157,7 +163,14 @@ func GetProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	isArabic := strings.Contains(r.URL.Path, "/ar")
-	json.NewEncoder(w).Encode(formatProductResponse(product, isArabic))
+	isAdmin := r.URL.Query().Get("isAdmin") == "true"
+
+	if isAdmin {
+		json.NewEncoder(w).Encode(product)
+		return
+	}
+
+	json.NewEncoder(w).Encode(formatProductResponse(product, isArabic, false))
 }
 
 func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
@@ -226,7 +239,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 }
 
 // Helper function to format product response based on language
-func formatProductResponse(product models.Product, isArabic bool) map[string]interface{} {
+func formatProductResponse(product models.Product, isArabic bool, isAdmin bool) map[string]interface{} {
 	if isArabic {
 		return map[string]interface{}{
 			"id":          product.ID,
@@ -239,6 +252,22 @@ func formatProductResponse(product models.Product, isArabic bool) map[string]int
 			"updatedAt":   product.UpdatedAt.Format(time.RFC3339),
 			"stock":       product.Stock,
 			"tag":         product.Tag,
+		}
+	}
+	if isAdmin {
+		return map[string]interface{}{
+			"id":            product.ID,
+			"sku":           product.Sku,
+			"title":         product.Title,
+			"titleAr":       product.TitleAr,
+			"description":   product.Description,
+			"descriptionAr": product.DescriptionAr,
+			"price":         product.Price,
+			"image":         product.Image,
+			"createdAt":     product.CreatedAt.Format(time.RFC3339),
+			"updatedAt":     product.UpdatedAt.Format(time.RFC3339),
+			"stock":         product.Stock,
+			"tag":           product.Tag,
 		}
 	}
 	return map[string]interface{}{
