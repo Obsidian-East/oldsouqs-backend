@@ -9,6 +9,7 @@ import (
 type Order struct {
 	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	OrderID        string             `bson:"orderId" json:"orderId"`
+	PhoneNumber	   string             `bson:"phoneNumber" json:"phoneNumber"`
 	UserID         string             `bson:"userId" json:"userId"`
 	Location       string             `bson:"userLocation" json:"userLocation"`
 	Items          []CartItem         `bson:"items" json:"items"`
