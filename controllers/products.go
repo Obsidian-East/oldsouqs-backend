@@ -204,8 +204,29 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	product.UpdatedAt = time.Now()
+	var existing models.Product
+	err = collection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&existing)
+	if err != nil {
+		http.Error(w, "Product not found", http.StatusNotFound)
+		return
+	}
 
-	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, bson.M{"$set": product})
+	// Then apply updates manually:
+	update := bson.M{
+		// Only update fields that are non-zero or intentionally changed
+		"sku":           product.Sku,
+		"title":         product.Title,
+		"titleAr":       product.TitleAr,
+		"description":   product.Description,
+		"descriptionAr": product.DescriptionAr,
+		"price":         product.Price,
+		"image":         product.Image,
+		"tag":           product.Tag,
+		"stock":         product.Stock,
+		"updatedAt":     time.Now(),
+	}
+
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, bson.M{"$set": update})
 	if err != nil {
 		http.Error(w, "Failed to update product", http.StatusInternalServerError)
 		return
