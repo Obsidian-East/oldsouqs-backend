@@ -237,7 +237,9 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 }
 
 func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
-	id := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	id := vars["id"] // ✅ from path, NOT query
+
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
 		return
@@ -250,13 +252,13 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	collection := db.Collection("products")
-	_, err = collection.DeleteOne(context.TODO(), bson.M{"_id": objID})
-	if err != nil {
+	res, err := collection.DeleteOne(context.TODO(), bson.M{"_id": objID})
+	if err != nil || res.DeletedCount == 0 {
 		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
 }
 
 // Helper function to format product response based on language
