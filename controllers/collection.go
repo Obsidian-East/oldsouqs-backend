@@ -97,25 +97,29 @@ func UpdateCollection(w http.ResponseWriter, r *http.Request, db *mongo.Database
 		return
 	}
 
-	var updatedCollection models.Collection
-	if err := json.NewDecoder(r.Body).Decode(&updatedCollection); err != nil {
+	// Decode only the fields expected to be updated
+	var updateFields map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&updateFields); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
+	// Remove _id if present (prevent overriding the document ID)
+	delete(updateFields, "_id")
+
 	collectionCollection := db.Collection("collections")
-	_, err = collectionCollection.UpdateOne(
+	result, err := collectionCollection.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": objID},
-		bson.M{"$set": updatedCollection},
+		bson.M{"$set": updateFields},
 	)
-	if err != nil {
+	if err != nil || result.MatchedCount == 0 {
 		http.Error(w, "Failed to update collection", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(updatedCollection)
+	json.NewEncoder(w).Encode(bson.M{"updated": true})
 }
 
 // DeleteCollection - Remove a collection

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -238,7 +239,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	vars := mux.Vars(r)
-	id := vars["id"] // ✅ from path, NOT query
+	id := vars["id"]
 
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
@@ -251,11 +252,33 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 		return
 	}
 
-	collection := db.Collection("products")
-	res, err := collection.DeleteOne(context.TODO(), bson.M{"_id": objID})
+	productCollection := db.Collection("products")
+	collectionCollection := db.Collection("collections")
+
+	var product models.Product
+	err = productCollection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&product)
+	if err != nil {
+		http.Error(w, "Product not found", http.StatusNotFound)
+		return
+	}
+
+	res, err := productCollection.DeleteOne(context.TODO(), bson.M{"_id": objID})
 	if err != nil || res.DeletedCount == 0 {
 		http.Error(w, "Failed to delete product", http.StatusInternalServerError)
 		return
+	}
+
+	for _, tag := range product.Tag {
+		filter := bson.M{"collectionName": tag}
+		update := bson.M{
+			"$pull": bson.M{
+				"productIds": objID,
+			},
+		}
+		_, err := collectionCollection.UpdateMany(context.TODO(), filter, update)
+		if err != nil {
+			log.Printf("Warning: failed to update collection with tag '%s': %v", tag, err)
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
