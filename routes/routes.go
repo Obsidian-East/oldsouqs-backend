@@ -161,5 +161,24 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	// Sirv Handle
 	router.HandleFunc("/api/upload", controllers.UploadImageToSirv).Methods("POST")
 
+	// Discount routes
+	router.HandleFunc("/discounts", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			controllers.GetDiscounts(w, r, db)
+		case http.MethodPost:
+			controllers.CreateDiscount(w, r, db)
+		}
+	}).Methods("GET", "POST")
+
+	router.HandleFunc("/discounts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			controllers.UpdateDiscount(w, r, db)
+		case http.MethodDelete:
+			controllers.DeleteDiscount(w, r, db)
+		}
+	}).Methods("PUT", "DELETE")
+
 	return router
 }
