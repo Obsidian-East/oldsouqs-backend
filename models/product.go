@@ -14,6 +14,7 @@ type Product struct {
 	Description   string             `bson:"description" json:"description"`
 	DescriptionAr string             `bson:"descriptionAr" json:"descriptionAr"`
 	Price         float64            `bson:"price" json:"price"`
+	OriginalPrice *float64           `bson:"originalPrice,omitempty" json:"originalPrice,omitempty"` // Added for discount reversion
 	Image         string             `bson:"image" json:"image"`
 	Tag           []string           `bson:"tag" json:"tag"`
 	Stock         int32              `bson:"stock" json:"stock"`
