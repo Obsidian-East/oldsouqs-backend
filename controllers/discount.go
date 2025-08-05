@@ -17,15 +17,17 @@ import (
 
 // DiscountController wraps Mongo collections for DI
 type DiscountController struct {
-	Discounts *mongo.Collection
-	Products  *mongo.Collection
+	Discounts   *mongo.Collection
+	Products    *mongo.Collection
+	Collections *mongo.Collection // Added for collection discounts
 }
 
 // NewDiscountController constructor
 func NewDiscountController(db *mongo.Database) *DiscountController {
 	return &DiscountController{
-		Discounts: db.Collection("discounts"),
-		Products:  db.Collection("products"),
+		Discounts:   db.Collection("discounts"),
+		Products:    db.Collection("products"),
+		Collections: db.Collection("collections"), // Added for collection discounts
 	}
 }
 
@@ -54,26 +56,35 @@ func (dc *DiscountController) applyDiscount(ctx context.Context, discount models
 			}
 		}
 	} else if discount.TargetType == "collection" {
-		filter := bson.M{"productIds": discount.TargetID}
-		cursor, err := dc.Products.Find(ctx, filter)
+		var collection models.Collection
+		err := dc.Collections.FindOne(ctx, bson.M{"_id": discount.TargetID}).Decode(&collection)
 		if err != nil {
-			return fmt.Errorf("failed to find products in collection: %w", err)
-		}
-		defer cursor.Close(ctx)
-
-		var products []models.Product
-		if err := cursor.All(ctx, &products); err != nil {
-			return fmt.Errorf("failed to decode products: %w", err)
+			return fmt.Errorf("collection not found: %w", err)
 		}
 
-		for _, product := range products {
-			if product.OriginalPrice == nil {
+		for _, productID := range collection.ProductIds {
+			var product models.Product
+			err := dc.Products.FindOne(ctx, bson.M{"_id": productID}).Decode(&product)
+			if err != nil {
+				fmt.Printf("Product %s not found in collection: %v\n", productID.Hex(), err)
+				continue
+			}
+
+			if product.OriginalPrice == nil || *product.OriginalPrice == 0 {
 				originalPrice := product.Price
 				newPrice := newPriceFunc(originalPrice, discount.Percentage)
-				update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
-				_, err = dc.Products.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
+
+				update := bson.M{
+					"$set": bson.M{
+						"price":         newPrice,
+						"originalPrice": originalPrice,
+						"updatedAt":     time.Now(),
+					},
+				}
+
+				_, err := dc.Products.UpdateByID(ctx, productID, update)
 				if err != nil {
-					fmt.Printf("Error updating product %s: %v\n", product.ID.Hex(), err)
+					fmt.Printf("Failed to update product %s: %v\n", productID.Hex(), err)
 				}
 			}
 		}
@@ -110,6 +121,40 @@ func (dc *DiscountController) revertDiscount(ctx context.Context, discountID pri
 			_, err := dc.Products.UpdateByID(ctx, discount.TargetID, update)
 			if err != nil {
 				return err
+			}
+		}
+	}
+
+	if discount.TargetType == "collection" {
+		var collection models.Collection
+		err := dc.Collections.FindOne(ctx, bson.M{"_id": discount.TargetID}).Decode(&collection)
+		if err != nil {
+			return fmt.Errorf("collection not found: %w", err)
+		}
+
+		for _, productID := range collection.ProductIds {
+			var product models.Product
+			err := dc.Products.FindOne(ctx, bson.M{"_id": productID}).Decode(&product)
+			if err != nil {
+				fmt.Printf("Error finding product %s: %v\n", productID.Hex(), err)
+				continue
+			}
+
+			if product.OriginalPrice != nil {
+				update := bson.M{
+					"$set": bson.M{
+						"price":     *product.OriginalPrice,
+						"updatedAt": time.Now(),
+					},
+					"$unset": bson.M{
+						"originalPrice": "",
+					},
+				}
+
+				_, err := dc.Products.UpdateByID(ctx, productID, update)
+				if err != nil {
+					fmt.Printf("Failed to revert product %s: %v\n", productID.Hex(), err)
+				}
 			}
 		}
 	}
