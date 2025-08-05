@@ -15,64 +15,68 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// DiscountController wraps Mongo collections for DI
-type DiscountController struct {
-	Discounts *mongo.Collection
-	Products  *mongo.Collection
-}
+var discountCollection *mongo.Collection
+var productCollection *mongo.Collection
+var collectionCollection *mongo.Collection
 
-// NewDiscountController constructor
-func NewDiscountController(db *mongo.Database) *DiscountController {
-	return &DiscountController{
-		Discounts: db.Collection("discounts"),
-		Products:  db.Collection("products"),
-	}
+// InitDiscountController initializes the collections needed for the discount logic.
+func InitDiscountController(db *mongo.Database) {
+	discountCollection = db.Collection("discounts")
+	productCollection = db.Collection("products")
+	collectionCollection = db.Collection("collections")
 }
 
 // applyDiscount logic: saves original price and updates to discounted price
-func (dc *DiscountController) applyDiscount(ctx context.Context, discount models.Discount) error {
+func applyDiscount(ctx context.Context, discount models.Discount) error {
+	filter := bson.M{}
+	update := bson.M{}
+
+	// Calculate the new price
+	// Formula: new_price = original_price * (100 - percentage) / 100
 	newPriceFunc := func(originalPrice float64, percentage float64) float64 {
 		return originalPrice - (originalPrice * percentage / 100)
 	}
 
 	if discount.TargetType == "product" {
-		filter := bson.M{"_id": discount.TargetID}
+		filter = bson.M{"_id": discount.TargetID}
 
 		var product models.Product
-		err := dc.Products.FindOne(ctx, filter).Decode(&product)
+		err := productCollection.FindOne(ctx, filter).Decode(&product)
 		if err != nil {
 			return fmt.Errorf("product not found: %w", err)
 		}
 
-		if product.OriginalPrice == nil {
+		if product.OriginalPrice == nil { // Only apply discount if one isn't already active
 			originalPrice := product.Price
 			newPrice := newPriceFunc(originalPrice, discount.Percentage)
-			update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
-			_, err = dc.Products.UpdateOne(ctx, filter, update)
+			update = bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
+			_, err = productCollection.UpdateOne(ctx, filter, update)
 			if err != nil {
 				return fmt.Errorf("failed to update product price: %w", err)
 			}
 		}
+
 	} else if discount.TargetType == "collection" {
-		filter := bson.M{"productIds": discount.TargetID}
-		cursor, err := dc.Products.Find(ctx, filter)
+		filter = bson.M{"productIds": discount.TargetID} // Using productIds field for collection
+		cursor, err := productCollection.Find(ctx, filter)
 		if err != nil {
 			return fmt.Errorf("failed to find products in collection: %w", err)
 		}
 		defer cursor.Close(ctx)
 
 		var products []models.Product
-		if err := cursor.All(ctx, &products); err != nil {
+		if err = cursor.All(ctx, &products); err != nil {
 			return fmt.Errorf("failed to decode products: %w", err)
 		}
 
 		for _, product := range products {
-			if product.OriginalPrice == nil {
+			if product.OriginalPrice == nil { // Only apply discount if one isn't already active
 				originalPrice := product.Price
 				newPrice := newPriceFunc(originalPrice, discount.Percentage)
-				update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
-				_, err = dc.Products.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
+				update = bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
+				_, err = productCollection.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
 				if err != nil {
+					// Log the error and continue to the next product
 					fmt.Printf("Error updating product %s: %v\n", product.ID.Hex(), err)
 				}
 			}
@@ -82,44 +86,48 @@ func (dc *DiscountController) applyDiscount(ctx context.Context, discount models
 }
 
 // revertDiscount logic: restores the original price and removes the originalPrice field
-func (dc *DiscountController) revertDiscount(ctx context.Context, discountID primitive.ObjectID) error {
+func revertDiscount(ctx context.Context, discountID primitive.ObjectID) error {
 	var discount models.Discount
-	err := dc.Discounts.FindOne(ctx, bson.M{"_id": discountID}).Decode(&discount)
+	err := discountCollection.FindOne(ctx, bson.M{"_id": discountID}).Decode(&discount)
 	if err != nil {
 		return fmt.Errorf("discount not found: %w", err)
 	}
 
+	filter := bson.M{}
+	update := bson.M{}
+
 	if discount.TargetType == "product" {
-		filter := bson.M{"_id": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
-		update := bson.M{
+		filter = bson.M{"_id": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
+		// Set price to originalPrice and remove the originalPrice field
+		update = bson.M{
 			"$set":   bson.M{"price": "$originalPrice"},
 			"$unset": bson.M{"originalPrice": ""},
 		}
-		_, err = dc.Products.UpdateOne(ctx, filter, update)
+		_, err = productCollection.UpdateOne(ctx, filter, update)
 		if err != nil {
 			return fmt.Errorf("failed to revert product price: %w", err)
 		}
+
 	} else if discount.TargetType == "collection" {
-		filter := bson.M{"productIds": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
-		cursor, err := dc.Products.Find(ctx, filter)
+		filter = bson.M{"productIds": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
+		cursor, err := productCollection.Find(ctx, filter)
 		if err != nil {
 			return fmt.Errorf("failed to find products in collection: %w", err)
 		}
 		defer cursor.Close(ctx)
 
 		var products []models.Product
-		if err := cursor.All(ctx, &products); err != nil {
+		if err = cursor.All(ctx, &products); err != nil {
 			return fmt.Errorf("failed to decode products: %w", err)
 		}
 
 		for _, product := range products {
 			if product.OriginalPrice != nil {
-				update := bson.M{
-					"$set":   bson.M{"price": *product.OriginalPrice},
-					"$unset": bson.M{"originalPrice": ""},
-				}
-				_, err = dc.Products.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
+				// Set price to originalPrice and remove the originalPrice field
+				update = bson.M{"$set": bson.M{"price": *product.OriginalPrice}, "$unset": bson.M{"originalPrice": ""}}
+				_, err = productCollection.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
 				if err != nil {
+					// Log the error and continue to the next product
 					fmt.Printf("Error reverting product %s: %v\n", product.ID.Hex(), err)
 				}
 			}
@@ -128,49 +136,45 @@ func (dc *DiscountController) revertDiscount(ctx context.Context, discountID pri
 	return nil
 }
 
-// CreateDiscount handles POST /discounts
-func (dc *DiscountController) CreateDiscount(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
+// CreateDiscount handles creating a new discount and applying it to products
+func CreateDiscount(w http.ResponseWriter, r *http.Request) {
 	var discount models.Discount
 	if err := json.NewDecoder(r.Body).Decode(&discount); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-
-	if discount.TargetType == "" || discount.TargetID.IsZero() || discount.Percentage <= 0 {
-		http.Error(w, "Missing or invalid fields", http.StatusBadRequest)
+	if discount.Percentage < 0 || discount.Percentage > 100 {
+		http.Error(w, "Invalid percentage value", http.StatusBadRequest)
 		return
 	}
-
-	discount.CreatedAt = time.Now()
-	discount.UpdatedAt = time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	res, err := dc.Discounts.InsertOne(ctx, discount)
+	// 1. Insert the discount into the database
+	res, err := discountCollection.InsertOne(ctx, discount)
 	if err != nil {
 		http.Error(w, "Failed to create discount", http.StatusInternalServerError)
 		return
 	}
-
 	discount.ID = res.InsertedID.(primitive.ObjectID)
 
-	// Apply discount logic
-	if err := dc.applyDiscount(ctx, discount); err != nil {
-		fmt.Printf("Warning: Failed to apply discount: %v\n", err)
+	// 2. Apply the discount to the targeted products
+	if err := applyDiscount(ctx, discount); err != nil {
+		// Log the error but still return the created discount
+		fmt.Printf("Error applying discount: %v\n", err)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(discount)
 }
 
-// GetDiscounts handles GET /discounts
-func (dc *DiscountController) GetDiscounts(w http.ResponseWriter, r *http.Request) {
+// GetDiscounts fetches all discounts from the database.
+func GetDiscounts(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cursor, err := dc.Discounts.Find(ctx, bson.M{})
+	cursor, err := discountCollection.Find(ctx, bson.M{})
 	if err != nil {
 		http.Error(w, "Failed to fetch discounts", http.StatusInternalServerError)
 		return
@@ -187,8 +191,8 @@ func (dc *DiscountController) GetDiscounts(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(discounts)
 }
 
-// UpdateDiscount handles PUT /discounts/{id}
-func (dc *DiscountController) UpdateDiscount(w http.ResponseWriter, r *http.Request) {
+// UpdateDiscount handles updating an existing discount and re-applying the new discount percentage
+func UpdateDiscount(w http.ResponseWriter, r *http.Request) {
 	idParam := mux.Vars(r)["id"]
 	discountID, err := primitive.ObjectIDFromHex(idParam)
 	if err != nil {
@@ -205,36 +209,38 @@ func (dc *DiscountController) UpdateDiscount(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := dc.revertDiscount(ctx, discountID); err != nil {
+	// 1. Find and revert the old discount
+	if err := revertDiscount(ctx, discountID); err != nil {
 		fmt.Printf("Error reverting old discount: %v\n", err)
 		http.Error(w, "Failed to revert old discount", http.StatusInternalServerError)
 		return
 	}
 
+	// 2. Update the discount document
 	update := bson.M{
 		"$set": bson.M{
 			"targetType": updated.TargetType,
 			"targetId":   updated.TargetID,
 			"percentage": updated.Percentage,
-			"updatedAt":  time.Now(),
 		},
 	}
-	_, err = dc.Discounts.UpdateOne(ctx, bson.M{"_id": discountID}, update)
+	_, err = discountCollection.UpdateOne(ctx, bson.M{"_id": discountID}, update)
 	if err != nil {
 		http.Error(w, "Failed to update discount", http.StatusInternalServerError)
 		return
 	}
 
+	// 3. Apply the new discount
 	updated.ID = discountID
-	if err := dc.applyDiscount(ctx, updated); err != nil {
+	if err := applyDiscount(ctx, updated); err != nil {
 		fmt.Printf("Error applying new discount: %v\n", err)
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// DeleteDiscount handles DELETE /discounts/{id}
-func (dc *DiscountController) DeleteDiscount(w http.ResponseWriter, r *http.Request) {
+// DeleteDiscount handles deleting a discount and reverting the price changes on products
+func DeleteDiscount(w http.ResponseWriter, r *http.Request) {
 	idParam := mux.Vars(r)["id"]
 	discountID, err := primitive.ObjectIDFromHex(idParam)
 	if err != nil {
@@ -245,13 +251,15 @@ func (dc *DiscountController) DeleteDiscount(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := dc.revertDiscount(ctx, discountID); err != nil {
+	// 1. Revert the price changes on the targeted products
+	if err := revertDiscount(ctx, discountID); err != nil {
 		fmt.Printf("Error reverting discount: %v\n", err)
 		http.Error(w, "Failed to revert discount price", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = dc.Discounts.DeleteOne(ctx, bson.M{"_id": discountID})
+	// 2. Delete the discount document
+	_, err = discountCollection.DeleteOne(ctx, bson.M{"_id": discountID})
 	if err != nil {
 		http.Error(w, "Failed to delete discount", http.StatusInternalServerError)
 		return

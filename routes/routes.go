@@ -162,12 +162,12 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/api/upload", controllers.UploadImageToSirv).Methods("POST")
 
 	// Discount routes
-	controller := controllers.NewDiscountController(db)
+	controllers.InitDiscountController(db)
 
-	router.HandleFunc("/discounts", controller.CreateDiscount).Methods("POST")
-	router.HandleFunc("/discounts", controller.GetDiscounts).Methods("GET")
-	router.HandleFunc("/discounts/{id}", controller.UpdateDiscount).Methods("PUT")
-	router.HandleFunc("/discounts/{id}", controller.DeleteDiscount).Methods("DELETE")
+	router.HandleFunc("/api/discounts", controllers.CreateDiscount).Methods("POST")
+	router.HandleFunc("/api/discounts", controllers.GetDiscounts).Methods("GET")
+	router.HandleFunc("/api/discounts/{id}", controllers.UpdateDiscount).Methods("PUT")
+	router.HandleFunc("/api/discounts/{id}", controllers.DeleteDiscount).Methods("DELETE")
 
 	return router
 }
