@@ -44,7 +44,7 @@ func (dc *DiscountController) applyDiscount(ctx context.Context, discount models
 			return fmt.Errorf("product not found: %w", err)
 		}
 
-		if product.OriginalPrice == nil {
+		if product.OriginalPrice == nil || (product.OriginalPrice != nil && *product.OriginalPrice == 0.00) {
 			originalPrice := product.Price
 			newPrice := newPriceFunc(originalPrice, discount.Percentage)
 			update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
@@ -86,45 +86,34 @@ func (dc *DiscountController) revertDiscount(ctx context.Context, discountID pri
 	var discount models.Discount
 	err := dc.Discounts.FindOne(ctx, bson.M{"_id": discountID}).Decode(&discount)
 	if err != nil {
-		return fmt.Errorf("discount not found: %w", err)
+		return err
 	}
 
 	if discount.TargetType == "product" {
-		filter := bson.M{"_id": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
-		update := bson.M{
-			"$set":   bson.M{"price": "$originalPrice"},
-			"$unset": bson.M{"originalPrice": ""},
-		}
-		_, err = dc.Products.UpdateOne(ctx, filter, update)
+		var product models.Product
+		err := dc.Products.FindOne(ctx, bson.M{"_id": discount.TargetID}).Decode(&product)
 		if err != nil {
-			return fmt.Errorf("failed to revert product price: %w", err)
-		}
-	} else if discount.TargetType == "collection" {
-		filter := bson.M{"productIds": discount.TargetID, "originalPrice": bson.M{"$exists": true}}
-		cursor, err := dc.Products.Find(ctx, filter)
-		if err != nil {
-			return fmt.Errorf("failed to find products in collection: %w", err)
-		}
-		defer cursor.Close(ctx)
-
-		var products []models.Product
-		if err := cursor.All(ctx, &products); err != nil {
-			return fmt.Errorf("failed to decode products: %w", err)
+			return err
 		}
 
-		for _, product := range products {
-			if product.OriginalPrice != nil {
-				update := bson.M{
-					"$set":   bson.M{"price": *product.OriginalPrice},
-					"$unset": bson.M{"originalPrice": ""},
-				}
-				_, err = dc.Products.UpdateOne(ctx, bson.M{"_id": product.ID}, update)
-				if err != nil {
-					fmt.Printf("Error reverting product %s: %v\n", product.ID.Hex(), err)
-				}
+		if product.OriginalPrice != nil {
+			update := bson.M{
+				"$set": bson.M{
+					"price":     *product.OriginalPrice,
+					"updatedAt": time.Now(),
+				},
+				"$unset": bson.M{
+					"originalPrice": "",
+				},
+			}
+
+			_, err := dc.Products.UpdateByID(ctx, discount.TargetID, update)
+			if err != nil {
+				return err
 			}
 		}
 	}
+
 	return nil
 }
 
