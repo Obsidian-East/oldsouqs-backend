@@ -288,16 +288,17 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 func formatProductResponse(product models.Product, isArabic bool, isAdmin bool) map[string]interface{} {
 	if isArabic {
 		return map[string]interface{}{
-			"id":          product.ID,
-			"sku":         product.Sku,
-			"title":       product.TitleAr,
-			"description": product.DescriptionAr,
-			"price":       product.Price,
-			"image":       product.Image,
-			"createdAt":   product.CreatedAt.Format(time.RFC3339),
-			"updatedAt":   product.UpdatedAt.Format(time.RFC3339),
-			"stock":       product.Stock,
-			"tag":         product.Tag,
+			"id":            product.ID,
+			"sku":           product.Sku,
+			"title":         product.TitleAr,
+			"description":   product.DescriptionAr,
+			"price":         product.Price,
+			"image":         product.Image,
+			"createdAt":     product.CreatedAt.Format(time.RFC3339),
+			"updatedAt":     product.UpdatedAt.Format(time.RFC3339),
+			"stock":         product.Stock,
+			"tag":           product.Tag,
+			"originalPrice": product.OriginalPrice, // Include original price if available
 		}
 	}
 	if isAdmin {
@@ -314,19 +315,21 @@ func formatProductResponse(product models.Product, isArabic bool, isAdmin bool) 
 			"updatedAt":     product.UpdatedAt.Format(time.RFC3339),
 			"stock":         product.Stock,
 			"tag":           product.Tag,
+			"originalPrice": product.OriginalPrice, // Include original price if available
 		}
 	}
 	return map[string]interface{}{
-		"id":          product.ID,
-		"sku":         product.Sku,
-		"title":       product.Title,
-		"description": product.Description,
-		"price":       product.Price,
-		"image":       product.Image,
-		"createdAt":   product.CreatedAt.Format(time.RFC3339),
-		"updatedAt":   product.UpdatedAt.Format(time.RFC3339),
-		"stock":       product.Stock,
-		"tag":         product.Tag,
+		"id":            product.ID,
+		"sku":           product.Sku,
+		"title":         product.Title,
+		"description":   product.Description,
+		"price":         product.Price,
+		"image":         product.Image,
+		"createdAt":     product.CreatedAt.Format(time.RFC3339),
+		"updatedAt":     product.UpdatedAt.Format(time.RFC3339),
+		"stock":         product.Stock,
+		"tag":           product.Tag,
+		"originalPrice": product.OriginalPrice, // Include original price if available
 	}
 }
 
