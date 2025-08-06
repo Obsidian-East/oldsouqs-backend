@@ -169,5 +169,13 @@ func SetupRoutes(db *mongo.Database) *mux.Router {
 	router.HandleFunc("/discounts/{id}", controller.UpdateDiscount).Methods("PUT")
 	router.HandleFunc("/discounts/{id}", controller.DeleteDiscount).Methods("DELETE")
 
+	// Announcement routes
+	announcementController := controllers.NewAnnouncementController(db)
+	
+	router.HandleFunc("/announcements", announcementController.CreateAnnouncement).Methods("POST")
+	router.HandleFunc("/announcements", announcementController.GetAnnouncements).Methods("GET")
+	router.HandleFunc("/announcements/{id}", announcementController.UpdateAnnouncement).Methods("PUT")
+	router.HandleFunc("/announcements/{id}", announcementController.DeleteAnnouncement).Methods("DELETE")
+
 	return router
 }
