@@ -205,19 +205,39 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 	}
 
 	// Then apply updates manually:
-	update := bson.M{
-		// Only update fields that are non-zero or intentionally changed
-		"sku":           product.Sku,
-		"title":         product.Title,
-		"titleAr":       product.TitleAr,
-		"description":   product.Description,
-		"descriptionAr": product.DescriptionAr,
-		"price":         product.Price,
-		"image":         product.Image,
-		"tag":           product.Tag,
-		"stock":         product.Stock,
-		"updatedAt":     time.Now(),
+	update := bson.M{}
+
+	if product.Sku != "" {
+		update["sku"] = product.Sku
 	}
+	if product.Title != "" {
+		update["title"] = product.Title
+	}
+	if product.TitleAr != "" {
+		update["titleAr"] = product.TitleAr
+	}
+	if product.Description != "" {
+		update["description"] = product.Description
+	}
+	if product.DescriptionAr != "" {
+		update["descriptionAr"] = product.DescriptionAr
+	}
+	if product.Image != "" {
+		update["image"] = product.Image
+	}
+	if len(product.Tag) > 0 {
+		update["tag"] = product.Tag
+	}
+	if product.Price != 0 {
+		update["price"] = product.Price
+	}
+	// Use -1 as "no change" sentinel for stock?
+	if product.Stock != 0 {
+		update["stock"] = product.Stock
+	}
+
+	// Always update the timestamp
+	update["updatedAt"] = time.Now()
 
 	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objID}, bson.M{"$set": update})
 	if err != nil {
