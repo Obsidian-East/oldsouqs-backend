@@ -285,9 +285,13 @@ func (dc *DiscountController) DeleteDiscount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	_, err = dc.Discounts.DeleteOne(ctx, bson.M{"_id": discountID})
+	res, err := dc.Discounts.DeleteOne(ctx, bson.M{"_id": discountID})
 	if err != nil {
 		http.Error(w, "Failed to delete discount", http.StatusInternalServerError)
+		return
+	}
+	if res.DeletedCount == 0 {
+		http.Error(w, "Discount not found or already deleted", http.StatusNotFound)
 		return
 	}
 
