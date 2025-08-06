@@ -49,7 +49,7 @@ func (dc *DiscountController) applyDiscount(ctx context.Context, discount models
 		if product.OriginalPrice == nil || (product.OriginalPrice != nil && *product.OriginalPrice == 0.00) {
 			originalPrice := product.Price
 			newPrice := newPriceFunc(originalPrice, discount.Percentage)
-			update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": originalPrice}}
+			update := bson.M{"$set": bson.M{"price": newPrice, "originalPrice": &originalPrice}}
 			_, err = dc.Products.UpdateOne(ctx, filter, update)
 			if err != nil {
 				return fmt.Errorf("failed to update product price: %w", err)
@@ -77,7 +77,7 @@ func (dc *DiscountController) applyDiscount(ctx context.Context, discount models
 				update := bson.M{
 					"$set": bson.M{
 						"price":         newPrice,
-						"originalPrice": originalPrice,
+						"originalPrice": &originalPrice,
 						"updatedAt":     time.Now(),
 					},
 				}
