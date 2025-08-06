@@ -196,14 +196,6 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request, db *mongo.Database) {
 
 	collection := db.Collection("products")
 
-	// Ensure SKU remains unique
-	var existingProduct models.Product
-	err = collection.FindOne(context.TODO(), bson.M{"sku": product.Sku, "_id": bson.M{"$ne": objID}}).Decode(&existingProduct)
-	if err == nil {
-		http.Error(w, "SKU already exists", http.StatusConflict)
-		return
-	}
-
 	product.UpdatedAt = time.Now()
 	var existing models.Product
 	err = collection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&existing)
