@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"oldsouqs-backend/models"
 
@@ -153,6 +154,8 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 		return
 	}
 
+	isArabic := strings.Contains(r.URL.Path, "/ar")
+
 	collectionCollection := db.Collection("collections")
 	var collection models.Collection
 	err = collectionCollection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&collection)
@@ -180,5 +183,10 @@ func GetProductsByCollection(w http.ResponseWriter, r *http.Request, db *mongo.D
 		return
 	}
 
-	json.NewEncoder(w).Encode(products)
+	var response []map[string]interface{}
+	for _, product := range products {
+		response = append(response, formatProductResponse(product, isArabic, false))
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
